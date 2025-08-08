@@ -7,21 +7,11 @@
 import * as pty from '@lydell/node-pty';
 import { TextDecoder } from 'util';
 import os from 'os';
+import stripAnsi from 'strip-ansi';
 import { getCachedEncodingForBuffer } from '../utils/systemEncoding.js';
 import { isBinary } from '../utils/textUtils.js';
-import pkg from '@xterm/headless';
-const { Terminal } = pkg;
 
-// @ts-expect-error getFullText is not a public API.
-const getFullText = (terminal: Terminal) => {
-  const buffer = terminal.buffer.active;
-  const lines: string[] = [];
-  for (let i = 0; i < buffer.length; i++) {
-    const line = buffer.getLine(i);
-    lines.push(line ? line.translateToString(true) : '');
-  }
-  return lines.join('\n').trim();
-};
+const SIGKILL_TIMEOUT_MS = 200;
 
 /** A structured result from a shell command execution. */
 export interface ShellExecutionResult {
@@ -95,39 +85,21 @@ export class ShellExecutionService {
     terminalRows?: number,
   ): ShellExecutionHandle {
     const isWindows = os.platform() === 'win32';
-    const shell = isWindows ? 'cmd.exe' : 'bash';
-    const args = isWindows
-      ? ['/c', commandToExecute]
-      : ['-c', commandToExecute];
 
-    let ptyProcess;
-    try {
-      ptyProcess = pty.spawn(shell, args, {
-        cwd,
-        name: 'xterm-color',
-        cols: terminalColumns ?? 200,
-        rows: terminalRows ?? 20,
-        env: {
-          ...process.env,
-          GEMINI_CLI: '1',
-        },
-        handleFlowControl: true,
-      });
-    } catch (e) {
-      const error = e as Error;
-      return {
-        pid: undefined,
-        result: Promise.resolve({
-          rawOutput: Buffer.from(''),
-          output: '',
-          exitCode: 1,
-          signal: null,
-          error,
-          aborted: false,
-          pid: undefined,
-        }),
-      };
-    }
+    const child = spawn(commandToExecute, [], {
+      cwd,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      // Use bash unless in Windows (since it doesn't support bash).
+      // For windows, just use the default.
+      shell: isWindows ? true : 'bash',
+      // Use process groups on non-Windows for robust killing.
+      // Windows process termination is handled by `taskkill /t`.
+      detached: !isWindows,
+      env: {
+        ...process.env,
+        GEMINI_CLI: '1',
+      },
+    });
 
     const result = new Promise<ShellExecutionResult>((resolve) => {
       const headlessTerminal = new Terminal({
