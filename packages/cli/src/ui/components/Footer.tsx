@@ -129,7 +129,7 @@ export const Footer: React.FC<FooterProps> = ({
         </Text>
         {corgiMode && (
           <Text color={theme.text.primary}>
-            <Text color={theme.ui.symbol}>| </Text>
+            <Text color={theme.text.secondary}>| </Text>
             <Text color={theme.status.error}>▼</Text>
             <Text color={theme.text.primary}>(´</Text>
             <Text color={theme.status.error}>ᴥ</Text>
@@ -139,7 +139,7 @@ export const Footer: React.FC<FooterProps> = ({
         )}
         {!showErrorDetails && errorCount > 0 && (
           <Box>
-            <Text color={theme.ui.symbol}>| </Text>
+            <Text color={theme.text.secondary}>| </Text>
             <ConsoleSummaryDisplay errorCount={errorCount} />
           </Box>
         )}
