@@ -55,7 +55,15 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({ text }) => {
       } else if (
         fullMatch.length > ITALIC_MARKER_LENGTH * 2 &&
         ((fullMatch.startsWith('*') && fullMatch.endsWith('*')) ||
-          (fullMatch.startsWith('_') && fullMatch.endsWith('_')))
+          (fullMatch.startsWith('_') && fullMatch.endsWith('_'))) &&
+        !/\w/.test(text.substring(match.index - 1, match.index)) &&
+        !/\w/.test(
+          text.substring(inlineRegex.lastIndex, inlineRegex.lastIndex + 1),
+        ) &&
+        !/\S[./]/.test(text.substring(match.index - 2, match.index)) &&
+        !/[./]\S/.test(
+          text.substring(inlineRegex.lastIndex, inlineRegex.lastIndex + 2),
+        )
       ) {
         renderedNode = (
           <Text key={key} italic color={theme.text.primary}>
@@ -93,7 +101,7 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({ text }) => {
         fullMatch.includes('](') &&
         fullMatch.endsWith(')')
       ) {
-        const linkMatch = fullMatch.match(/.*\[(.*?)].*\((.*?)\)/);
+        const linkMatch = fullMatch.match(/\[(.*?)\]\((.*?)\)/);
         if (linkMatch) {
           const linkText = linkMatch[1];
           const url = linkMatch[2];
