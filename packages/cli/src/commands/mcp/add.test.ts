@@ -85,4 +85,55 @@ describe('mcp add command', () => {
       },
     );
   });
+
+  it('should add a server with command and args after -- separator', async () => {
+    await parser.parseAsync(
+      'add test-server -- npx -y https://example.com/test-mcp-server',
+    );
+
+    expect(mockSetValue).toHaveBeenCalledWith(
+      SettingScope.Workspace,
+      'mcpServers',
+      {
+        'test-server': {
+          command: 'npx',
+          args: ['-y', 'https://example.com/test-mcp-server'],
+        },
+      },
+    );
+  });
+
+  it('should add a server with unknown options as args', async () => {
+    await parser.parseAsync(
+      'add python-server python3 server.py --port=8000 --verbose',
+    );
+
+    expect(mockSetValue).toHaveBeenCalledWith(
+      SettingScope.Workspace,
+      'mcpServers',
+      {
+        'python-server': {
+          command: 'python3',
+          args: ['server.py', '--port=8000', '--verbose'],
+        },
+      },
+    );
+  });
+
+  it('should add a server with command and args after -- with command specified', async () => {
+    await parser.parseAsync(
+      'add test-server npx -- -y https://example.com/test-server',
+    );
+
+    expect(mockSetValue).toHaveBeenCalledWith(
+      SettingScope.Workspace,
+      'mcpServers',
+      {
+        'test-server': {
+          command: 'npx',
+          args: ['-y', 'https://example.com/test-server'],
+        },
+      },
+    );
+  });
 });

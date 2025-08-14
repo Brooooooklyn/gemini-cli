@@ -125,11 +125,42 @@ async function addMcpServer(
 }
 
 export const addCommand: CommandModule = {
-  command: 'add <name> <commandOrUrl> [args...]',
+  command: 'add <name> [commandOrUrl] [args...]',
   describe: 'Add a server',
   builder: (yargs) =>
     yargs
       .usage('Usage: gemini mcp add [options] <name> <commandOrUrl> [args...]')
+      .parserConfiguration({
+        'populate--': true,
+        'unknown-options-as-args': true,
+      })
+      .check((argv) => {
+        // Allow the -- case by checking if we have args after --
+        const doubleHyphenArgs = (argv as Record<string, unknown>)['--'] as
+          | string[]
+          | undefined;
+        if (
+          !argv.commandOrUrl &&
+          doubleHyphenArgs &&
+          doubleHyphenArgs.length > 0
+        ) {
+          // Case: gemini mcp add name -- command arg1 arg2
+          return true;
+        }
+        if (
+          argv.commandOrUrl &&
+          doubleHyphenArgs &&
+          doubleHyphenArgs.length > 0
+        ) {
+          // Case: gemini mcp add name command -- arg1 arg2
+          return true;
+        }
+        // Normal validation - ensure we have commandOrUrl
+        if (!argv.commandOrUrl) {
+          throw new Error("Missing required argument 'commandOrUrl'");
+        }
+        return true;
+      })
       .positional('name', {
         describe: 'Name of the server',
         type: 'string',
@@ -138,7 +169,7 @@ export const addCommand: CommandModule = {
       .positional('commandOrUrl', {
         describe: 'Command (stdio) or URL (sse, http)',
         type: 'string',
-        demandOption: true,
+        demandOption: false,
       })
       .option('scope', {
         alias: 's',
@@ -191,21 +222,36 @@ export const addCommand: CommandModule = {
         string: true,
       }),
   handler: async (argv) => {
-    await addMcpServer(
-      argv.name as string,
-      argv.commandOrUrl as string,
-      argv.args as Array<string | number>,
-      {
-        scope: argv.scope as string,
-        transport: argv.transport as string,
-        env: argv.env as string[],
-        header: argv.header as string[],
-        timeout: argv.timeout as number | undefined,
-        trust: argv.trust as boolean | undefined,
-        description: argv.description as string | undefined,
-        includeTools: argv.includeTools as string[] | undefined,
-        excludeTools: argv.excludeTools as string[] | undefined,
-      },
-    );
+    let commandOrUrl = argv.commandOrUrl as string;
+    let args = argv.args as Array<string | number>;
+
+    // Handle case where command comes after -- (with populate-- enabled, they go to argv['--'])
+    const doubleHyphenArgs = (argv as Record<string, unknown>)['--'] as
+      | string[]
+      | undefined;
+    if (!commandOrUrl && doubleHyphenArgs && doubleHyphenArgs.length > 0) {
+      // Case: gemini mcp add name -- command arg1 arg2
+      commandOrUrl = doubleHyphenArgs[0] as string;
+      args = doubleHyphenArgs.slice(1);
+    } else if (
+      commandOrUrl &&
+      doubleHyphenArgs &&
+      doubleHyphenArgs.length > 0
+    ) {
+      // Case: gemini mcp add name command -- arg1 arg2
+      args = doubleHyphenArgs;
+    }
+
+    await addMcpServer(argv.name as string, commandOrUrl, args, {
+      scope: argv.scope as string,
+      transport: argv.transport as string,
+      env: argv.env as string[],
+      header: argv.header as string[],
+      timeout: argv.timeout as number | undefined,
+      trust: argv.trust as boolean | undefined,
+      description: argv.description as string | undefined,
+      includeTools: argv.includeTools as string[] | undefined,
+      excludeTools: argv.excludeTools as string[] | undefined,
+    });
   },
 };
