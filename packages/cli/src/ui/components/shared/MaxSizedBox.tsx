@@ -173,7 +173,7 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
     <Box key={index}>
       {line.length > 0 ? (
         line.map((segment, segIndex) => (
-           // Avoid adding color styles to this <Text> element, breaks code colorization
+          // Avoid adding color styles to this <Text> element, breaks code colorization
           <Text key={segIndex} {...segment.props}>
             {segment.text}
           </Text>
