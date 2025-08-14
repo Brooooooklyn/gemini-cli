@@ -6,10 +6,10 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import { Colors } from '../../colors.js';
 import crypto from 'crypto';
 import { colorizeCode, colorizeLine } from '../../utils/CodeColorizer.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
+import { theme } from '../../semantic-colors.js';
 
 interface DiffLine {
   type: 'add' | 'del' | 'context' | 'hunk' | 'other';
@@ -107,14 +107,20 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
   theme,
 }) => {
   if (!diffContent || typeof diffContent !== 'string') {
-    return <Text color={Colors.AccentYellow}>No diff content.</Text>;
+    return (
+      <Text color={theme?.semanticColors.status.warning}>No diff content.</Text>
+    );
   }
 
   const parsedLines = parseDiffWithLineNumbers(diffContent);
 
   if (parsedLines.length === 0) {
     return (
-      <Box borderStyle="round" borderColor={Colors.Gray} padding={1}>
+      <Box
+        borderStyle="round"
+        borderColor={theme?.semanticColors.border.default}
+        padding={1}
+      >
         <Text dimColor>No changes detected.</Text>
       </Box>
     );
@@ -183,7 +189,11 @@ const renderDiffContent = (
 
   if (displayableLines.length === 0) {
     return (
-      <Box borderStyle="round" borderColor={Colors.Gray} padding={1}>
+      <Box
+        borderStyle="round"
+        borderColor={theme?.border.default}
+        padding={1}
+      >
         <Text dimColor>No changes detected.</Text>
       </Box>
     );
@@ -247,7 +257,10 @@ const renderDiffContent = (
         ) {
           acc.push(
             <Box key={`gap-${index}`}>
-              <Text wrap="truncate" color={Colors.Gray}>
+              <Text
+                wrap="truncate"
+                color={theme?.border.default}
+              >
                 {'═'.repeat(terminalWidth)}
               </Text>
             </Box>,
@@ -287,7 +300,7 @@ const renderDiffContent = (
 
         acc.push(
           <Box key={lineKey} flexDirection="row">
-            <Text color={Colors.Gray}>
+            <Text color={theme?.text.secondary}>
               {gutterNumStr.padStart(gutterWidth)}{' '}
             </Text>
             {line.type === 'context' ? (
@@ -300,7 +313,9 @@ const renderDiffContent = (
             ) : (
               <Text
                 backgroundColor={
-                  line.type === 'add' ? Colors.DiffAdded : Colors.DiffRemoved
+                  line.type === 'add'
+                    ? theme?.background.diff.added
+                    : theme?.background.diff.removed
                 }
                 wrap="wrap"
               >
