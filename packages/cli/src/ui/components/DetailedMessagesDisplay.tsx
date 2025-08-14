@@ -56,7 +56,7 @@ export const DetailedMessagesDisplay: React.FC<
               icon = '\u2716'; // Heavy multiplication x (✖)
               break;
             case 'debug':
-              textColor = theme.text.secondary; // Or Colors.Gray
+              textColor = theme.text.secondary;
               icon = '\u1F50D'; // Left-pointing magnifying glass (????)
               break;
             case 'log':
