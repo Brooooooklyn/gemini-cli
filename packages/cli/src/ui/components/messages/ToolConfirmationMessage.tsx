@@ -117,7 +117,7 @@ export const ToolConfirmationMessage: React.FC<
           padding={1}
           overflow="hidden"
         >
-          <Text>Modify in progress: </Text>
+          <Text color={theme.text.primary}>Modify in progress: </Text>
           <Text color={theme.status.success}>
             Save and close external editor to continue
           </Text>
@@ -225,9 +225,12 @@ export const ToolConfirmationMessage: React.FC<
         <Text color={theme.text.accent}>{infoProps.prompt}</Text>
         {displayUrls && infoProps.urls && infoProps.urls.length > 0 && (
           <Box flexDirection="column" marginTop={1}>
-            <Text>URLs to fetch:</Text>
+            <Text color={theme.text.primary}>URLs to fetch:</Text>
             {infoProps.urls.map((url) => (
-              <Text key={url}> - {url}</Text>
+              <Text key={url} color={theme.text.primary}>
+                {' '}
+                - {url}
+              </Text>
             ))}
           </Box>
         )}
@@ -275,7 +278,9 @@ export const ToolConfirmationMessage: React.FC<
 
       {/* Confirmation Question */}
       <Box marginBottom={1} flexShrink={0}>
-        <Text wrap="truncate">{question}</Text>
+        <Text wrap="truncate" color={theme.text.primary}>
+          {question}
+        </Text>
       </Box>
 
       {/* Select Input for Options */}

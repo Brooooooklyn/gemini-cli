@@ -189,11 +189,7 @@ const renderDiffContent = (
 
   if (displayableLines.length === 0) {
     return (
-      <Box
-        borderStyle="round"
-        borderColor={theme?.border.default}
-        padding={1}
-      >
+      <Box borderStyle="round" borderColor={theme?.border.default} padding={1}>
         <Text dimColor>No changes detected.</Text>
       </Box>
     );
@@ -257,10 +253,7 @@ const renderDiffContent = (
         ) {
           acc.push(
             <Box key={`gap-${index}`}>
-              <Text
-                wrap="truncate"
-                color={theme?.border.default}
-              >
+              <Text wrap="truncate" color={theme?.border.default}>
                 {'═'.repeat(terminalWidth)}
               </Text>
             </Box>,
@@ -305,7 +298,7 @@ const renderDiffContent = (
             </Text>
             {line.type === 'context' ? (
               <>
-                <Text>{prefixSymbol} </Text>
+                <Text color={theme.text.primary}>{prefixSymbol} </Text>
                 <Text wrap="wrap">
                   {colorizeLine(displayContent, language)}
                 </Text>

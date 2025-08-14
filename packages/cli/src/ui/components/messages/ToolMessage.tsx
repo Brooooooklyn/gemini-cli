@@ -90,7 +90,9 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
             {typeof resultDisplay === 'string' && !renderOutputAsMarkdown && (
               <MaxSizedBox maxHeight={availableHeight} maxWidth={childWidth}>
                 <Box>
-                  <Text wrap="wrap">{resultDisplay}</Text>
+                  <Text wrap="wrap" color={theme.text.primary}>
+                    {resultDisplay}
+                  </Text>
                 </Box>
               </MaxSizedBox>
             )}
@@ -176,6 +178,7 @@ const ToolInfo: React.FC<ToolInfo> = ({
       <Text
         wrap="truncate-end"
         strikethrough={status === ToolCallStatus.Canceled}
+        color={theme.text.primary}
       >
         <Text color={nameColor} bold>
           {name}
