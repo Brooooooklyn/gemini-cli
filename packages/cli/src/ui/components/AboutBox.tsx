@@ -46,7 +46,7 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
         </Text>
       </Box>
       <Box>
-        <Text>{cliVersion}</Text>
+        <Text color={theme.text.primary}>{cliVersion}</Text>
       </Box>
     </Box>
     {GIT_COMMIT_INFO && !['N/A'].includes(GIT_COMMIT_INFO) && (
@@ -57,7 +57,7 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
           </Text>
         </Box>
         <Box>
-          <Text>{GIT_COMMIT_INFO}</Text>
+          <Text color={theme.text.primary}>{GIT_COMMIT_INFO}</Text>
         </Box>
       </Box>
     )}
@@ -68,7 +68,7 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
         </Text>
       </Box>
       <Box>
-        <Text>{modelVersion}</Text>
+        <Text color={theme.text.primary}>{modelVersion}</Text>
       </Box>
     </Box>
     <Box flexDirection="row">
@@ -78,7 +78,7 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
         </Text>
       </Box>
       <Box>
-        <Text>{sandboxEnv}</Text>
+        <Text color={theme.text.primary}>{sandboxEnv}</Text>
       </Box>
     </Box>
     <Box flexDirection="row">
@@ -88,7 +88,7 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
         </Text>
       </Box>
       <Box>
-        <Text>{osVersion}</Text>
+        <Text color={theme.text.primary}>{osVersion}</Text>
       </Box>
     </Box>
     <Box flexDirection="row">
@@ -98,7 +98,7 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
         </Text>
       </Box>
       <Box>
-        <Text>
+        <Text color={theme.text.primary}>
           {selectedAuthType.startsWith('oauth') ? 'OAuth' : selectedAuthType}
         </Text>
       </Box>
@@ -111,7 +111,7 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
           </Text>
         </Box>
         <Box>
-          <Text>{gcpProject}</Text>
+          <Text color={theme.text.primary}>{gcpProject}</Text>
         </Box>
       </Box>
     )}

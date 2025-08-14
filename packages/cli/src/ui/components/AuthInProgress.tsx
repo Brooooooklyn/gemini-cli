@@ -51,7 +51,7 @@ export function AuthInProgress({
         </Text>
       ) : (
         <Box>
-          <Text>
+          <Text color={theme.text.primary}>
             <Spinner type="dots" /> Waiting for auth... (Press ESC or CTRL+C to
             cancel)
           </Text>

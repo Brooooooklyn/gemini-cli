@@ -445,7 +445,11 @@ export function SettingsDialog({
         <Box height={1} />
 
         <Box marginTop={1} flexDirection="column">
-          <Text bold={focusSection === 'scope'} wrap="truncate">
+          <Text
+            bold={focusSection === 'scope'}
+            wrap="truncate"
+            color={theme.text.primary}
+          >
             {focusSection === 'scope' ? '> ' : '  '}Apply To
           </Text>
           <RadioButtonSelect

@@ -49,19 +49,19 @@ export const Header: React.FC<HeaderProps> = ({
     >
       {theme.ui.gradient ? (
         <Gradient colors={theme.ui.gradient}>
-          <Text>{displayTitle}</Text>
+          <Text color={theme.text.primary}>{displayTitle}</Text>
         </Gradient>
       ) : (
-        <Text>{displayTitle}</Text>
+        <Text color={theme.text.primary}>{displayTitle}</Text>
       )}
       {nightly && (
         <Box width="100%" flexDirection="row" justifyContent="flex-end">
           {theme.ui.gradient ? (
             <Gradient colors={theme.ui.gradient}>
-              <Text>v{version}</Text>
+              <Text color={theme.text.primary}>v{version}</Text>
             </Gradient>
           ) : (
-            <Text>v{version}</Text>
+            <Text color={theme.text.primary}>v{version}</Text>
           )}
         </Box>
       )}

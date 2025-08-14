@@ -138,9 +138,13 @@ export function AuthDialog({
       padding={1}
       width="100%"
     >
-      <Text bold>Get started</Text>
+      <Text bold color={theme.text.primary}>
+        Get started
+      </Text>
       <Box marginTop={1}>
-        <Text>How would you like to authenticate for this project?</Text>
+        <Text color={theme.text.primary}>
+          How would you like to authenticate for this project?
+        </Text>
       </Box>
       <Box marginTop={1}>
         <RadioButtonSelect
@@ -159,7 +163,9 @@ export function AuthDialog({
         <Text color={theme.text.secondary}>(Use Enter to select)</Text>
       </Box>
       <Box marginTop={1}>
-        <Text>Terms of Services and Privacy Notice for Gemini CLI</Text>
+        <Text color={theme.text.primary}>
+          Terms of Services and Privacy Notice for Gemini CLI
+        </Text>
       </Box>
       <Box marginTop={1}>
         <Text color={theme.text.link}>
