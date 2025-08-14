@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { Text } from 'ink';
-import { Colors } from '../colors.js';
+import { theme } from '../semantic-colors.js';
 import stringWidth from 'string-width';
 
 // Constants for Markdown parsing
@@ -91,7 +91,7 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({ text }) => {
         const codeMatch = fullMatch.match(/^(`+)(.+?)\1$/s);
         if (codeMatch && codeMatch[2]) {
           renderedNode = (
-            <Text key={key} color={Colors.AccentPurple}>
+            <Text key={key} color={theme.text.accent}>
               {codeMatch[2]}
             </Text>
           );
@@ -108,7 +108,7 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({ text }) => {
           renderedNode = (
             <Text key={key}>
               {linkText}
-              <Text color={Colors.AccentBlue}> ({url})</Text>
+              <Text color={theme.text.link}> ({url})</Text>
             </Text>
           );
         }

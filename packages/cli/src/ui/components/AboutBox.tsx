@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import { Colors } from '../colors.js';
+import { theme } from '../semantic-colors.js';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 
 interface AboutBoxProps {
@@ -28,20 +28,20 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
 }) => (
   <Box
     borderStyle="round"
-    borderColor={Colors.Gray}
+    borderColor={theme.border.default}
     flexDirection="column"
     padding={1}
     marginY={1}
     width="100%"
   >
     <Box marginBottom={1}>
-      <Text bold color={Colors.AccentPurple}>
+      <Text bold color={theme.text.accent}>
         About Gemini CLI
       </Text>
     </Box>
     <Box flexDirection="row">
       <Box width="35%">
-        <Text bold color={Colors.LightBlue}>
+        <Text bold color={theme.text.link}>
           CLI Version
         </Text>
       </Box>
@@ -52,7 +52,7 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
     {GIT_COMMIT_INFO && !['N/A'].includes(GIT_COMMIT_INFO) && (
       <Box flexDirection="row">
         <Box width="35%">
-          <Text bold color={Colors.LightBlue}>
+          <Text bold color={theme.text.link}>
             Git Commit
           </Text>
         </Box>
@@ -63,7 +63,7 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
     )}
     <Box flexDirection="row">
       <Box width="35%">
-        <Text bold color={Colors.LightBlue}>
+        <Text bold color={theme.text.link}>
           Model
         </Text>
       </Box>
@@ -73,7 +73,7 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
     </Box>
     <Box flexDirection="row">
       <Box width="35%">
-        <Text bold color={Colors.LightBlue}>
+        <Text bold color={theme.text.link}>
           Sandbox
         </Text>
       </Box>
@@ -83,7 +83,7 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
     </Box>
     <Box flexDirection="row">
       <Box width="35%">
-        <Text bold color={Colors.LightBlue}>
+        <Text bold color={theme.text.link}>
           OS
         </Text>
       </Box>
@@ -93,7 +93,7 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
     </Box>
     <Box flexDirection="row">
       <Box width="35%">
-        <Text bold color={Colors.LightBlue}>
+        <Text bold color={theme.text.link}>
           Auth Method
         </Text>
       </Box>
@@ -106,7 +106,7 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
     {gcpProject && (
       <Box flexDirection="row">
         <Box width="35%">
-          <Text bold color={Colors.LightBlue}>
+          <Text bold color={theme.text.link}>
             GCP Project
           </Text>
         </Box>

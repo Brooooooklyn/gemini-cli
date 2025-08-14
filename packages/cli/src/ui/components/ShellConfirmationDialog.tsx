@@ -7,7 +7,7 @@
 import { ToolConfirmationOutcome } from '@google/gemini-cli-core';
 import { Box, Text } from 'ink';
 import React from 'react';
-import { Colors } from '../colors.js';
+import { theme } from '../semantic-colors.js';
 import {
   RadioButtonSelect,
   RadioSelectItem,
@@ -69,7 +69,7 @@ export const ShellConfirmationDialog: React.FC<
     <Box
       flexDirection="column"
       borderStyle="round"
-      borderColor={Colors.AccentYellow}
+      borderColor={theme.status.warning}
       padding={1}
       width="100%"
       marginLeft={1}
@@ -80,12 +80,12 @@ export const ShellConfirmationDialog: React.FC<
         <Box
           flexDirection="column"
           borderStyle="round"
-          borderColor={Colors.Gray}
+          borderColor={theme.border.default}
           paddingX={1}
           marginTop={1}
         >
           {commands.map((cmd) => (
-            <Text key={cmd} color={Colors.AccentCyan}>
+            <Text key={cmd} color={theme.text.accent}>
               {cmd}
             </Text>
           ))}

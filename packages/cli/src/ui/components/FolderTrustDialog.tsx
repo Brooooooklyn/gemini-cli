@@ -6,7 +6,7 @@
 
 import { Box, Text } from 'ink';
 import React from 'react';
-import { Colors } from '../colors.js';
+import { theme } from '../semantic-colors.js';
 import {
   RadioButtonSelect,
   RadioSelectItem,
@@ -54,7 +54,7 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
     <Box
       flexDirection="column"
       borderStyle="round"
-      borderColor={Colors.AccentYellow}
+      borderColor={theme.status.warning}
       padding={1}
       width="100%"
       marginLeft={1}
