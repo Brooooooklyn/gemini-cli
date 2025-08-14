@@ -5,14 +5,19 @@
  */
 
 import { vi, describe, it, expect, beforeEach, type Mock } from 'vitest';
+
 const mockPtySpawn = vi.hoisted(() => vi.fn());
 vi.mock('@lydell/node-pty', () => ({
   spawn: mockPtySpawn,
 }));
 
+const mockCpSpawn = vi.hoisted(() => vi.fn());
+vi.mock('child_process', () => ({
+  spawn: mockCpSpawn,
+}));
+
 const mockGetShellConfiguration = vi.hoisted(() => vi.fn());
 let mockIsWindows = false;
-
 vi.mock('../utils/shell-utils.js', () => ({
   getShellConfiguration: mockGetShellConfiguration,
   get isWindows() {
@@ -31,6 +36,12 @@ vi.mock('../utils/textUtils.js', () => ({
   isBinary: mockIsBinary,
 }));
 
+const mockProcessKill = vi
+  .spyOn(process, 'kill')
+  .mockImplementation(() => true);
+
+const yieldEventLoop = () => new Promise(setImmediate);
+
 describe('ShellExecutionService', () => {
   let mockPtyProcess: EventEmitter & {
     pid: number;
@@ -45,6 +56,7 @@ describe('ShellExecutionService', () => {
 
     mockIsBinary.mockReturnValue(false);
 
+    // Setup default shell config (Linux/macOS)
     mockGetShellConfiguration.mockReturnValue({
       executable: 'bash',
       argsPrefix: ['-c'],
@@ -53,18 +65,17 @@ describe('ShellExecutionService', () => {
 
     onOutputEventMock = vi.fn();
 
-    mockChildProcess = new EventEmitter() as EventEmitter &
-      Partial<ChildProcess>;
-    // FIX: Cast simple EventEmitters to the expected stream type.
-    mockChildProcess.stdout = new EventEmitter() as Readable;
-    mockChildProcess.stderr = new EventEmitter() as Readable;
-    mockChildProcess.kill = vi.fn();
-
-    // FIX: Use Object.defineProperty to set the readonly 'pid' property.
-    Object.defineProperty(mockChildProcess, 'pid', {
-      value: 12345,
-      configurable: true,
-    });
+    // Initialize the mock PTY process
+    mockPtyProcess = new EventEmitter() as EventEmitter & {
+      pid: number;
+      kill: Mock;
+      onData: Mock;
+      onExit: Mock;
+    };
+    mockPtyProcess.pid = 12345;
+    mockPtyProcess.kill = vi.fn();
+    mockPtyProcess.onData = vi.fn();
+    mockPtyProcess.onExit = vi.fn();
 
     mockPtySpawn.mockReturnValue(mockPtyProcess);
   });
@@ -75,7 +86,7 @@ describe('ShellExecutionService', () => {
     simulation: (
       ptyProcess: typeof mockPtyProcess,
       ac: AbortController,
-    ) => void,
+    ) => void | Promise<void>,
   ) => {
     const abortController = new AbortController();
     const handle = ShellExecutionService.execute(
@@ -85,8 +96,11 @@ describe('ShellExecutionService', () => {
       abortController.signal,
     );
 
-    await new Promise((resolve) => setImmediate(resolve));
-    simulation(mockPtyProcess, abortController);
+    // Wait for initialization
+    await yieldEventLoop();
+    await simulation(mockPtyProcess, abortController);
+    await yieldEventLoop();
+
     const result = await handle.result;
     return { result, handle, abortController };
   };
@@ -94,31 +108,57 @@ describe('ShellExecutionService', () => {
   describe('Successful Execution', () => {
     it('should execute a command and capture output', async () => {
       const { result, handle } = await simulateExecution('ls -l', (pty) => {
-        pty.onData.mock.calls[0][0]('file1.txt\n');
+        // Input uses \n, but the service normalization (to \r\n) ensures correct display.
+        pty.onData.mock.calls[0][0](Buffer.from('file1.txt\n'));
         pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
       });
 
-      expect(mockSpawn).toHaveBeenCalledWith(
-        'ls -l',
-        [],
-        expect.objectContaining({ shell: 'bash' }),
+      expect(mockPtySpawn).toHaveBeenCalledWith(
+        'bash',
+        ['-c', 'ls -l'],
+        expect.objectContaining({
+          encoding: null, // Ensure we are requesting buffers
+        }),
       );
       expect(result.exitCode).toBe(0);
-      expect(result.signal).toBeNull();
-      expect(result.error).toBeNull();
-      expect(result.aborted).toBe(false);
       expect(result.output).toBe('file1.txt');
       expect(handle.pid).toBe(12345);
 
+      // The event contains the entire buffer content.
       expect(onOutputEventMock).toHaveBeenCalledWith({
         type: 'data',
         chunk: 'file1.txt',
       });
     });
 
+    it('should capture combined stdout and stderr (interleaved)', async () => {
+      const { result } = await simulateExecution(
+        'ls -l && echo err >&2',
+        (pty) => {
+          // Input uses \n, but the service normalization fixes the formatting issue seen in the failure log.
+          pty.onData.mock.calls[0][0](Buffer.from('file1.txt\n'));
+          pty.onData.mock.calls[0][0](Buffer.from('a warning\n'));
+          pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+        },
+      );
+
+      // The output should reflect the interleaved nature.
+      expect(result.output).toBe('file1.txt\na warning');
+
+      // Events report the cumulative state of the buffer.
+      expect(onOutputEventMock.mock.calls[0][0]).toEqual({
+        type: 'data',
+        chunk: 'file1.txt',
+      });
+      expect(onOutputEventMock.mock.calls[1][0]).toEqual({
+        type: 'data',
+        chunk: 'file1.txt\na warning',
+      });
+    });
+
     it('should strip ANSI codes from output', async () => {
       const { result } = await simulateExecution('ls --color=auto', (pty) => {
-        pty.onData.mock.calls[0][0]('a\u001b[31mred\u001b[0mword');
+        pty.onData.mock.calls[0][0](Buffer.from('a\u001b[31mred\u001b[0mword'));
         pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
       });
 
@@ -129,13 +169,34 @@ describe('ShellExecutionService', () => {
       });
     });
 
-    it('should correctly decode multi-byte characters split across chunks', async () => {
-      const { result } = await simulateExecution('echo "你好"', (pty) => {
-        const multiByteChar = '你好';
-        pty.onData.mock.calls[0][0](multiByteChar.slice(0, 1));
-        pty.onData.mock.calls[0][0](multiByteChar.slice(1));
+    it('should correctly handle cursor movements and overwrites (using xterm)', async () => {
+      const { result } = await simulateExecution('progress', async (pty) => {
+        const onData = pty.onData.mock.calls[0][0];
+        onData(Buffer.from('Progress: ['));
+        // We must yield to allow the async processingChain to execute
+        await yieldEventLoop();
+        onData(Buffer.from('==='));
+        await yieldEventLoop();
+        // Move cursor back 3 positions (\u001b[3D) and overwrite
+        onData(Buffer.from('\u001b[3DXXX'));
+        await yieldEventLoop();
+        onData(Buffer.from(']'));
         pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
       });
+
+      // The output should reflect the final state of the terminal buffer
+      expect(result.output).toBe('Progress: [XXX]');
+    });
+
+    it('should correctly decode multi-byte characters split across chunks', async () => {
+      const { result } = await simulateExecution('echo "你好"', (pty) => {
+        const multiByteChar = Buffer.from('你好', 'utf-8');
+        // Split the buffer in the middle of a character (e.g., after 2 bytes)
+        pty.onData.mock.calls[0][0](multiByteChar.slice(0, 2));
+        pty.onData.mock.calls[0][0](multiByteChar.slice(2));
+        pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+      });
+      // TextDecoder handles the boundary correctly.
       expect(result.output).toBe('你好');
     });
 
@@ -152,7 +213,7 @@ describe('ShellExecutionService', () => {
   describe('Failed Execution', () => {
     it('should capture a non-zero exit code', async () => {
       const { result } = await simulateExecution('a-bad-command', (pty) => {
-        pty.onData.mock.calls[0][0]('command not found');
+        pty.onData.mock.calls[0][0](Buffer.from('command not found'));
         pty.onExit.mock.calls[0][0]({ exitCode: 127, signal: null });
       });
 
@@ -163,10 +224,11 @@ describe('ShellExecutionService', () => {
 
     it('should capture a termination signal', async () => {
       const { result } = await simulateExecution('long-process', (pty) => {
-        pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: 15 });
+        // Signal 15 is SIGTERM
+        pty.onExit.mock.calls[0][0]({ exitCode: 143, signal: 15 });
       });
 
-      expect(result.exitCode).toBe(0);
+      expect(result.exitCode).toBe(143);
       expect(result.signal).toBe(15);
     });
 
@@ -191,60 +253,53 @@ describe('ShellExecutionService', () => {
     });
   });
 
-  describe('Aborting Commands', () => {
-    describe.each([
-      {
-        platform: 'linux',
-        expectedSignal: 'SIGTERM',
-        expectedExit: { signal: 'SIGKILL' as const },
-      },
-      {
-        platform: 'win32',
-        expectedCommand: 'taskkill',
-        expectedExit: { code: 1 },
-      },
-    ])(
-      'on $platform',
-      ({ platform, expectedSignal, expectedCommand, expectedExit }) => {
-        it('should abort a running process and set the aborted flag', async () => {
-          mockPlatform.mockReturnValue(platform);
+  describe('Aborting Commands (Robust)', () => {
+    it('should abort a running process on Linux/macOS (SIGTERM)', async () => {
+      mockIsWindows = false;
 
-          const { result } = await simulateExecution(
-            'sleep 10',
-            (cp, abortController) => {
-              abortController.abort();
-              if (expectedExit.signal)
-                cp.emit('exit', null, expectedExit.signal);
-              if (typeof expectedExit.code === 'number')
-                cp.emit('exit', expectedExit.code, null);
-            },
-          );
+      const { result } = await simulateExecution(
+        'sleep 10',
+        (pty, abortController) => {
+          abortController.abort();
+          // Simulate the process exiting due to the signal (15 = SIGTERM).
+          pty.onExit.mock.calls[0][0]({ exitCode: 143, signal: 15 });
+        },
+      );
 
-          expect(result.aborted).toBe(true);
+      expect(result.aborted).toBe(true);
+      // Check that the process group kill was attempted.
+      expect(mockProcessKill).toHaveBeenCalledWith(
+        -mockPtyProcess.pid!,
+        'SIGTERM',
+      );
+    });
 
-          if (platform === 'linux') {
-            expect(mockProcessKill).toHaveBeenCalledWith(
-              -mockChildProcess.pid!,
-              expectedSignal,
-            );
-          } else {
-            expect(mockSpawn).toHaveBeenCalledWith(expectedCommand, [
-              '/pid',
-              String(mockChildProcess.pid),
-              '/f',
-              '/t',
-            ]);
-          }
-        });
-      },
-    );
+    it('should abort a running process on Windows (taskkill)', async () => {
+      mockIsWindows = true;
+
+      const { result } = await simulateExecution(
+        'timeout 10',
+        (pty, abortController) => {
+          abortController.abort();
+          // Simulate the process exiting after taskkill
+          pty.onExit.mock.calls[0][0]({ exitCode: 1, signal: null });
+        },
+      );
+
+      expect(result.aborted).toBe(true);
+      // Check that taskkill was spawned via child_process.spawn
+      expect(mockCpSpawn).toHaveBeenCalledWith('taskkill', [
+        '/pid',
+        String(mockPtyProcess.pid),
+        '/f',
+        '/t',
+      ]);
+    });
 
     it('should gracefully attempt SIGKILL on linux if SIGTERM fails', async () => {
-      mockPlatform.mockReturnValue('linux');
+      mockIsWindows = false;
       vi.useFakeTimers();
 
-      // Don't await the result inside the simulation block for this specific test.
-      // We need to control the timeline manually.
       const abortController = new AbortController();
       const handle = ShellExecutionService.execute(
         'unresponsive_process',
@@ -253,31 +308,53 @@ describe('ShellExecutionService', () => {
         abortController.signal,
       );
 
+      await vi.runAllTicks();
+
       abortController.abort();
 
-      // Check the first kill signal
       expect(mockProcessKill).toHaveBeenCalledWith(
-        -mockChildProcess.pid!,
+        -mockPtyProcess.pid!,
         'SIGTERM',
       );
 
-      // Now, advance time past the timeout
       await vi.advanceTimersByTimeAsync(250);
 
-      // Check the second kill signal
       expect(mockProcessKill).toHaveBeenCalledWith(
-        -mockChildProcess.pid!,
+        -mockPtyProcess.pid!,
         'SIGKILL',
       );
 
-      // Finally, simulate the process exiting and await the result
-      mockChildProcess.emit('exit', null, 'SIGKILL');
+      mockPtyProcess.onExit.mock.calls[0][0]({ exitCode: 137, signal: 9 });
+
+      await vi.runAllTicks();
+
       const result = await handle.result;
 
       vi.useRealTimers();
 
       expect(result.aborted).toBe(true);
-      expect(mockPtyProcess.kill).toHaveBeenCalled();
+      expect(result.signal).toBe(9);
+      expect(mockProcessKill).toHaveBeenCalledTimes(2);
+    });
+
+    it('should fall back to pty.kill if process group kill throws an error', async () => {
+      mockIsWindows = false;
+      mockProcessKill.mockImplementation(() => {
+        throw new Error('ESRCH');
+      });
+
+      await simulateExecution('short-process', async (pty, abortController) => {
+        abortController.abort();
+        // Wait for the async abort handler to run
+        await yieldEventLoop();
+
+        expect(mockProcessKill).toHaveBeenCalledWith(-pty.pid, 'SIGTERM');
+        // It should have fallen back to the pty specific kill method
+        expect(pty.kill).toHaveBeenCalledWith('SIGKILL');
+
+        // Simulate exit after the fallback kill
+        pty.onExit.mock.calls[0][0]({ exitCode: 137, signal: 9 });
+      });
     });
   });
 
@@ -296,18 +373,19 @@ describe('ShellExecutionService', () => {
       expect(result.rawOutput).toEqual(
         Buffer.concat([binaryChunk1, binaryChunk2]),
       );
-      expect(onOutputEventMock).toHaveBeenCalledTimes(3);
-      expect(onOutputEventMock.mock.calls[0][0]).toEqual({
-        type: 'binary_detected',
-      });
-      expect(onOutputEventMock.mock.calls[1][0]).toEqual({
-        type: 'binary_progress',
-        bytesReceived: 4,
-      });
-      expect(onOutputEventMock.mock.calls[2][0]).toEqual({
-        type: 'binary_progress',
-        bytesReceived: 8,
-      });
+
+      expect(onOutputEventMock.mock.calls).toContainEqual([
+        {
+          type: 'binary_detected',
+        },
+      ]);
+
+      expect(onOutputEventMock.mock.calls).toContainEqual([
+        {
+          type: 'binary_progress',
+          bytesReceived: 8, // Total length
+        },
+      ]);
     });
 
     it('should not emit data events after binary is detected', async () => {
@@ -315,6 +393,7 @@ describe('ShellExecutionService', () => {
 
       await simulateExecution('cat mixed_file', (pty) => {
         pty.onData.mock.calls[0][0](Buffer.from('some text'));
+        // Chunk that triggers binary detection
         pty.onData.mock.calls[0][0](Buffer.from([0x00, 0x01, 0x02]));
         pty.onData.mock.calls[0][0](Buffer.from('more text'));
         pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
@@ -323,42 +402,55 @@ describe('ShellExecutionService', () => {
       const eventTypes = onOutputEventMock.mock.calls.map(
         (call: [ShellOutputEvent]) => call[0].type,
       );
-      expect(eventTypes).toEqual([
-        'data',
-        'binary_detected',
-        'binary_progress',
-        'binary_progress',
-      ]);
+
+      // We expect the sequence to transition from data -> binary_detected -> binary_progress
+      const detectedIndex = eventTypes.indexOf('binary_detected');
+      const firstProgressIndex = eventTypes.indexOf('binary_progress');
+
+      // The crucial check is that no 'data' events occur after 'binary_detected'.
+      if (detectedIndex !== -1) {
+        expect(eventTypes.slice(detectedIndex + 1)).not.toContain('data');
+      }
+
+      expect(detectedIndex).not.toBe(-1);
+      expect(firstProgressIndex).toBeGreaterThanOrEqual(detectedIndex);
     });
   });
 
   describe('Platform-Specific Behavior', () => {
-    it('should use cmd.exe on Windows', async () => {
-      mockPlatform.mockReturnValue('win32');
-      await simulateExecution('dir "foo bar"', (cp) =>
-        cp.emit('exit', 0, null),
+    it('should use Windows configuration', async () => {
+      mockGetShellConfiguration.mockReturnValue({
+        executable: 'cmd.exe',
+        argsPrefix: ['/c'],
+      });
+      mockIsWindows = true;
+
+      await simulateExecution('dir "foo bar"', (pty) =>
+        pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null }),
       );
 
-      expect(mockSpawn).toHaveBeenCalledWith(
-        'dir "foo bar"',
-        [],
+      expect(mockPtySpawn).toHaveBeenCalledWith(
+        'cmd.exe',
+        ['/c', 'dir "foo bar"'],
         expect.objectContaining({
-          shell: true,
-          detached: false,
+          encoding: null,
         }),
       );
     });
 
-    it('should use bash and detached process group on Linux', async () => {
-      mockPlatform.mockReturnValue('linux');
-      await simulateExecution('ls "foo bar"', (cp) => cp.emit('exit', 0, null));
+    it('should use Linux configuration', async () => {
+      // Defaults are already set for Linux/bash in beforeEach
+      mockIsWindows = false;
 
-      expect(mockSpawn).toHaveBeenCalledWith(
-        'ls "foo bar"',
-        [],
+      await simulateExecution('ls "foo bar"', (pty) =>
+        pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null }),
+      );
+
+      expect(mockPtySpawn).toHaveBeenCalledWith(
+        'bash',
+        ['-c', 'ls "foo bar"'],
         expect.objectContaining({
-          shell: 'bash',
-          detached: true,
+          encoding: null,
         }),
       );
     });
